@@ -5,8 +5,8 @@ import lombok.RequiredArgsConstructor;
 import me.chanjar.weixin.common.error.WxErrorException;
 import me.chanjar.weixin.mp.api.WxMpService;
 import me.chanjar.weixin.mp.api.WxMpWifiService;
+import me.chanjar.weixin.mp.bean.wifi.WxMpWifiShopDataResult;
 import me.chanjar.weixin.mp.bean.wifi.WxMpWifiShopListResult;
-import me.chanjar.weixin.mp.enums.WxMpApiUrl;
 
 import static me.chanjar.weixin.mp.enums.WxMpApiUrl.Wifi.*;
 
@@ -28,5 +28,29 @@ public class WxMpWifiServiceImpl implements WxMpWifiService {
     json.addProperty("pagesize", pageSize);
     final String result = this.wxMpService.post(BIZWIFI_SHOP_LIST, json.toString());
     return WxMpWifiShopListResult.fromJson(result);
+  }
+
+  @Override
+  public WxMpWifiShopDataResult getShopWifiInfo(int shopId) throws WxErrorException {
+    JsonObject json = new JsonObject();
+    json.addProperty("shop_id", shopId);
+    return WxMpWifiShopDataResult.fromJson(this.wxMpService.post(BIZWIFI_SHOP_GET, json.toString()));
+  }
+
+  @Override
+  public boolean updateShopWifiInfo(int shopId, String oldSsid, String ssid, String password) throws WxErrorException {
+    JsonObject json = new JsonObject();
+    json.addProperty("shop_id", shopId);
+    json.addProperty("old_ssid", oldSsid);
+    json.addProperty("ssid", ssid);
+    if (password != null) {
+      json.addProperty("password", password);
+    }
+    try {
+      this.wxMpService.post(BIZWIFI_SHOP_UPDATE, json.toString());
+      return true;
+    } catch (WxErrorException e) {
+      throw e;
+    }
   }
 }
