@@ -1,16 +1,16 @@
 package com.github.binarywang.wxpay.v3.auth;
 
 
-import java.io.IOException;
-
 import com.github.binarywang.wxpay.v3.Validator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.entity.ContentType;
 import org.apache.http.util.EntityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+
 @Slf4j
 public class WxPayValidator implements Validator {
   private Verifier verifier;
@@ -21,6 +21,9 @@ public class WxPayValidator implements Validator {
 
   @Override
   public final boolean validate(CloseableHttpResponse response) throws IOException {
+    if (!ContentType.APPLICATION_JSON.getMimeType().equals(ContentType.parse(String.valueOf(response.getFirstHeader("Content-Type").getValue())).getMimeType())) {
+      return true;
+    }
     Header serialNo = response.getFirstHeader("Wechatpay-Serial");
     Header sign = response.getFirstHeader("Wechatpay-Signature");
     Header timestamp = response.getFirstHeader("Wechatpay-TimeStamp");

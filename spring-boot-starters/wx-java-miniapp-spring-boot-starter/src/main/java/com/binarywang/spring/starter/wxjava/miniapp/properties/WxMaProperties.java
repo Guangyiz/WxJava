@@ -1,9 +1,12 @@
 package com.binarywang.spring.starter.wxjava.miniapp.properties;
 
+import com.binarywang.spring.starter.wxjava.miniapp.enums.HttpClientType;
+import com.binarywang.spring.starter.wxjava.miniapp.enums.StorageType;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
-import java.io.Serializable;
+import static com.binarywang.spring.starter.wxjava.miniapp.properties.WxMaProperties.PREFIX;
 
 /**
  * 属性配置类.
@@ -12,8 +15,10 @@ import java.io.Serializable;
  * @date 2019-08-10
  */
 @Data
-@ConfigurationProperties(prefix = "wx.miniapp")
+@ConfigurationProperties(prefix = PREFIX)
 public class WxMaProperties {
+  public static final String PREFIX = "wx.miniapp";
+
   /**
    * 设置微信小程序的appid.
    */
@@ -42,16 +47,15 @@ public class WxMaProperties {
   /**
    * 存储策略
    */
-  private ConfigStorage configStorage = new ConfigStorage();
+  private final ConfigStorage configStorage = new ConfigStorage();
 
   @Data
-  public static class ConfigStorage implements Serializable {
-    private static final long serialVersionUID = 4815731027000065434L;
+  public static class ConfigStorage {
 
     /**
      * 存储类型.
      */
-    private StorageType type = StorageType.memory;
+    private StorageType type = StorageType.Memory;
 
     /**
      * 指定key前缀.
@@ -61,12 +65,13 @@ public class WxMaProperties {
     /**
      * redis连接配置.
      */
-    private RedisProperties redis;
+    @NestedConfigurationProperty
+    private final RedisProperties redis = new RedisProperties();
 
     /**
      * http客户端类型.
      */
-    private HttpClientType httpClientType = HttpClientType.httpclient;
+    private HttpClientType httpClientType = HttpClientType.HttpClient;
 
     /**
      * http代理主机.
@@ -88,62 +93,20 @@ public class WxMaProperties {
      */
     private String httpProxyPassword;
 
+    /**
+     * http 请求重试间隔
+     * <pre>
+     *   {@link cn.binarywang.wx.miniapp.api.impl.BaseWxMaServiceImpl#setRetrySleepMillis(int)}
+     * </pre>
+     */
+    private int retrySleepMillis = 1000;
+    /**
+     * http 请求最大重试次数
+     * <pre>
+     *   {@link cn.binarywang.wx.miniapp.api.impl.BaseWxMaServiceImpl#setMaxRetryTimes(int)}
+     * </pre>
+     */
+    private int maxRetryTimes = 5;
   }
 
-  public enum StorageType {
-    /**
-     * 内存.
-     */
-    memory,
-    /**
-     * redis(JedisClient).
-     */
-    jedis,
-    /**
-     * redis(RedisTemplate).
-     */
-    redistemplate
-  }
-
-  public enum HttpClientType {
-    /**
-     * HttpClient.
-     */
-    httpclient
-  }
-
-  @Data
-  public static class RedisProperties implements Serializable {
-    private static final long serialVersionUID = -5924815351660074401L;
-
-    /**
-     * 主机地址.
-     */
-    private String host;
-
-    /**
-     * 端口号.
-     */
-    private int port = 6379;
-
-    /**
-     * 密码.
-     */
-    private String password;
-
-    /**
-     * 超时.
-     */
-    private int timeout = 2000;
-
-    /**
-     * 数据库.
-     */
-    private int database = 0;
-
-    private Integer maxActive;
-    private Integer maxIdle;
-    private Integer maxWaitMillis;
-    private Integer minIdle;
-  }
 }

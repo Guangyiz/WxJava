@@ -1,14 +1,16 @@
 package com.github.binarywang.wxpay.bean.payscore;
 
+import java.io.Serializable;
+import java.util.List;
+
 import com.google.gson.annotations.SerializedName;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
-
-import java.io.Serializable;
-import java.util.List;
+import me.chanjar.weixin.common.util.json.WxGsonBuilder;
 
 /**
  * @author doger.wang
@@ -21,6 +23,10 @@ import java.util.List;
 @Accessors(chain = true)
 public class WxPayScoreRequest implements Serializable {
   private static final long serialVersionUID = 364764508076146082L;
+
+  public String toJson() {
+    return WxGsonBuilder.create().toJson(this);
+  }
 
   /**
    * out_order_no : 1234323JKHDFE1243252
@@ -58,15 +64,15 @@ public class WxPayScoreRequest implements Serializable {
   @SerializedName("openid")
   private String openid;
   @SerializedName("need_user_confirm")
-  private boolean needUserConfirm;
+  private Boolean needUserConfirm;
   @SerializedName("profit_sharing")
-  private boolean profitSharing;
+  private Boolean profitSharing;
   @SerializedName("post_payments")
   private List<PostPayment> postPayments;
   @SerializedName("post_discounts")
   private List<PostDiscount> postDiscounts;
   @SerializedName("total_amount")
-  private int totalAmount;
+  private Integer totalAmount;
   @SerializedName("reason")
   private String reason;
   @SerializedName("goods_tag")
@@ -75,5 +81,7 @@ public class WxPayScoreRequest implements Serializable {
   private String type;
   @SerializedName("detail")
   private Detail detail;
+  @SerializedName("authorization_code")
+  private  String authorizationCode;
 
 }

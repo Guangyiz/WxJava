@@ -1,21 +1,23 @@
 package com.github.binarywang.wxpay.v3.auth;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.binarywang.wxpay.v3.Credentials;
 import com.github.binarywang.wxpay.v3.Validator;
 import com.github.binarywang.wxpay.v3.WxPayV3HttpClientBuilder;
 import com.github.binarywang.wxpay.v3.util.AesUtils;
 import com.github.binarywang.wxpay.v3.util.PemUtils;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import me.chanjar.weixin.common.error.WxRuntimeException;
+import me.chanjar.weixin.common.util.json.GsonParser;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
-import org.joda.time.Instant;
-import org.joda.time.Minutes;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -25,6 +27,7 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -93,13 +96,21 @@ public class AutoUpdateCertificatesVerifier implements Verifier {
       autoUpdateCert();
       instant = Instant.now();
     } catch (IOException | GeneralSecurityException e) {
-      throw new RuntimeException(e);
+      throw new WxRuntimeException(e);
     }
   }
 
   @Override
   public boolean verify(String serialNumber, byte[] message, String signature) {
-    if (instant == null || Minutes.minutesBetween(instant, Instant.now()).getMinutes() >= minutesInterval) {
+    checkAndAutoUpdateCert();
+    return verifier.verify(serialNumber, message, signature);
+  }
+
+  /**
+   * 检查证书是否在有效期内，如果不在有效期内则进行更新
+   */
+  private void checkAndAutoUpdateCert() {
+    if (instant == null || instant.plus(minutesInterval, ChronoUnit.MINUTES).compareTo(Instant.now()) >= 0) {
       if (lock.tryLock()) {
         try {
           autoUpdateCert();
@@ -112,7 +123,6 @@ public class AutoUpdateCertificatesVerifier implements Verifier {
         }
       }
     }
-    return verifier.verify(serialNumber, message, signature);
   }
 
   private void autoUpdateCert() throws IOException, GeneralSecurityException {
@@ -148,32 +158,41 @@ public class AutoUpdateCertificatesVerifier implements Verifier {
    * 反序列化证书并解密
    */
   private List<X509Certificate> deserializeToCerts(byte[] apiV3Key, String body) throws GeneralSecurityException, IOException {
-    AesUtils decryptor = new AesUtils(apiV3Key);
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode dataNode = mapper.readTree(body).get("data");
-    List<X509Certificate> newCertList = new ArrayList<>();
-    if (dataNode != null) {
-      for (int i = 0, count = dataNode.size(); i < count; i++) {
-        JsonNode encryptCertificateNode = dataNode.get(i).get("encrypt_certificate");
-        //解密
-        String cert = decryptor.decryptToString(
-          encryptCertificateNode.get("associated_data").toString().replaceAll("\"", "")
-            .getBytes(StandardCharsets.UTF_8),
-          encryptCertificateNode.get("nonce").toString().replaceAll("\"", "")
-            .getBytes(StandardCharsets.UTF_8),
-          encryptCertificateNode.get("ciphertext").toString().replaceAll("\"", ""));
+    AesUtils aesUtils = new AesUtils(apiV3Key);
+    final JsonObject json = GsonParser.parse(body);
+    final JsonArray dataNode = json.getAsJsonArray("data");
+    if (dataNode == null) {
+      return Collections.emptyList();
+    }
 
-        X509Certificate x509Cert = PemUtils
-          .loadCertificate(new ByteArrayInputStream(cert.getBytes(StandardCharsets.UTF_8)));
-        try {
-          x509Cert.checkValidity();
-        } catch (CertificateExpiredException | CertificateNotYetValidException e) {
-          continue;
-        }
-        newCertList.add(x509Cert);
+    List<X509Certificate> newCertList = new ArrayList<>();
+    for (int i = 0, count = dataNode.size(); i < count; i++) {
+      final JsonObject encryptCertificateNode = ((JsonObject) dataNode.get(i)).getAsJsonObject("encrypt_certificate");
+      //解密
+      String cert = aesUtils.decryptToString(
+        encryptCertificateNode.get("associated_data").toString().replaceAll("\"", "")
+          .getBytes(StandardCharsets.UTF_8),
+        encryptCertificateNode.get("nonce").toString().replaceAll("\"", "")
+          .getBytes(StandardCharsets.UTF_8),
+        encryptCertificateNode.get("ciphertext").toString().replaceAll("\"", ""));
+
+      X509Certificate x509Cert = PemUtils
+        .loadCertificate(new ByteArrayInputStream(cert.getBytes(StandardCharsets.UTF_8)));
+      try {
+        x509Cert.checkValidity();
+      } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+        continue;
       }
+      newCertList.add(x509Cert);
     }
 
     return newCertList;
   }
+
+  @Override
+  public X509Certificate getValidCertificate() {
+    checkAndAutoUpdateCert();
+    return verifier.getValidCertificate();
+  }
+
 }

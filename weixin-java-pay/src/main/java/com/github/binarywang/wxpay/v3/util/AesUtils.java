@@ -1,7 +1,14 @@
 package com.github.binarywang.wxpay.v3.util;
 
+import com.google.common.base.CharMatcher;
+import com.google.common.io.BaseEncoding;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
@@ -11,11 +18,6 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import javax.crypto.Cipher;
-import javax.crypto.Mac;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 public class AesUtils {
 
@@ -30,6 +32,31 @@ public class AesUtils {
     this.aesKey = key;
   }
 
+  public static byte[] decryptToByte(byte[] nonce, byte[] cipherData, byte[] key)
+    throws GeneralSecurityException {
+    return decryptToByte(null, nonce, cipherData, key);
+  }
+
+  public static byte[] decryptToByte(byte[] associatedData, byte[] nonce, byte[] cipherData, byte[] key)
+    throws GeneralSecurityException {
+    try {
+      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+
+      SecretKeySpec secretKeySpec = new SecretKeySpec(key, "AES");
+      GCMParameterSpec spec = new GCMParameterSpec(TAG_LENGTH_BIT, nonce);
+
+      cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, spec);
+      if (associatedData != null) {
+        cipher.updateAAD(associatedData);
+      }
+      return cipher.doFinal(cipherData);
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+      throw new IllegalStateException(e);
+    } catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
   public String decryptToString(byte[] associatedData, byte[] nonce, String ciphertext)
       throws GeneralSecurityException, IOException {
     try {
@@ -41,7 +68,7 @@ public class AesUtils {
       cipher.init(Cipher.DECRYPT_MODE, key, spec);
       cipher.updateAAD(associatedData);
 
-      return new String(cipher.doFinal(Base64.getDecoder().decode(ciphertext)), "utf-8");
+      return new String(cipher.doFinal(BaseEncoding.base64().decode(CharMatcher.whitespace().removeFrom(ciphertext))), "utf-8");
     } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
       throw new IllegalStateException(e);
     } catch (InvalidKeyException | InvalidAlgorithmParameterException e) {

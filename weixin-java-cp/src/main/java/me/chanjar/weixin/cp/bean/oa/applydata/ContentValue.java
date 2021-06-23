@@ -2,6 +2,7 @@ package me.chanjar.weixin.cp.bean.oa.applydata;
 
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;
+import lombok.experimental.Accessors;
 
 import java.io.Serializable;
 import java.util.List;
@@ -10,16 +11,17 @@ import java.util.List;
  * @author element
  */
 @Data
+@Accessors(chain = true)
 public class ContentValue implements Serializable {
   private static final long serialVersionUID = -5607678965965065261L;
 
   private String text;
 
   @SerializedName("new_number")
-  private Double newNumber;
+  private String newNumber;
 
   @SerializedName("new_money")
-  private Double newMoney;
+  private String newMoney;
 
   private ContentValue.Date date;
 
@@ -35,13 +37,15 @@ public class ContentValue implements Serializable {
 
   private Attendance attendance;
 
+  private Vacation vacation;
+
   @Data
   public static class Date implements Serializable {
     private static final long serialVersionUID = -6181554080062231138L;
     private String type;
 
     @SerializedName("s_timestamp")
-    private Double timestamp;
+    private String timestamp;
   }
 
   @Data
@@ -90,7 +94,7 @@ public class ContentValue implements Serializable {
   @Data
   public static class Child implements Serializable {
     private static final long serialVersionUID = -3500102073821161558L;
-    private List<Content> list;
+    private List<ApplyDataContent> list;
   }
 
 
@@ -114,6 +118,11 @@ public class ContentValue implements Serializable {
     }
   }
 
-
+  @Data
+  public static class Vacation implements Serializable {
+    private static final long serialVersionUID = 2120523160034749170L;
+    private Selector selector;
+    private Attendance attendance;
+  }
 
 }

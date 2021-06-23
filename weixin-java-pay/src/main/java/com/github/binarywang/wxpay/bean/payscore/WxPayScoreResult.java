@@ -3,6 +3,7 @@ package com.github.binarywang.wxpay.bean.payscore;
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import me.chanjar.weixin.common.util.json.WxGsonBuilder;
 
 import java.io.Serializable;
 import java.util.List;
@@ -16,6 +17,10 @@ import java.util.Map;
 @Data
 public class WxPayScoreResult implements Serializable {
   private static final long serialVersionUID = 8809250065540275770L;
+
+  public static WxPayScoreResult fromJson(String json) {
+    return WxGsonBuilder.create().fromJson(json, WxPayScoreResult.class);
+  }
 
   /**
    * appid : wxd678efh567hg6787
@@ -79,6 +84,22 @@ public class WxPayScoreResult implements Serializable {
    */
   @SerializedName("payScoreSignInfo")
   private Map<String, String> payScoreSignInfo;
+
+  @SerializedName("apply_permissions_token")
+  private  String applyPermissionsToken;
+
+  @SerializedName("authorization_code")
+  private  String authorizationCode;
+
+  @SerializedName("authorization_state")
+  private  String authorizationState;
+
+  @SerializedName("cancel_authorization_time")
+  private  String cancelAuthorizationTime;
+
+  @SerializedName("authorization_success_time")
+  private  String authorizationSuccessTime;
+
 
   /**
    * 收款信息

@@ -1,9 +1,7 @@
 package cn.binarywang.wx.miniapp.config.impl;
 
 import me.chanjar.weixin.common.enums.TicketType;
-import me.chanjar.weixin.common.redis.JedisWxRedisOps;
 import me.chanjar.weixin.common.redis.WxRedisOps;
-import redis.clients.jedis.JedisPool;
 
 import java.util.concurrent.TimeUnit;
 
@@ -20,10 +18,6 @@ public class WxMaRedisBetterConfigImpl extends WxMaDefaultConfigImpl {
 
   private volatile String accessTokenKey;
   private volatile String lockKey;
-
-  public WxMaRedisBetterConfigImpl(JedisPool jedisPool) {
-    this(new JedisWxRedisOps(jedisPool), "wa");
-  }
 
   public WxMaRedisBetterConfigImpl(WxRedisOps redisOps, String keyPrefix) {
     this.redisOps = redisOps;

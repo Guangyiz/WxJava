@@ -1,6 +1,8 @@
 package com.github.binarywang.wxpay.service.impl;
 
+import com.github.binarywang.wxpay.bean.ecommerce.SignatureHeader;
 import com.github.binarywang.wxpay.bean.payscore.PayScoreNotifyData;
+import com.github.binarywang.wxpay.bean.payscore.UserAuthorizationStatusNotifyResult;
 import com.github.binarywang.wxpay.bean.payscore.WxPayScoreRequest;
 import com.github.binarywang.wxpay.bean.payscore.WxPayScoreResult;
 import com.github.binarywang.wxpay.config.WxPayConfig;
@@ -11,14 +13,17 @@ import com.github.binarywang.wxpay.v3.util.AesUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import lombok.RequiredArgsConstructor;
+import me.chanjar.weixin.common.util.json.WxGsonBuilder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.utils.URIBuilder;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @author doger.wang
@@ -30,15 +35,115 @@ public class PayScoreServiceImpl implements PayScoreService {
   private final WxPayService payService;
 
   @Override
+  public WxPayScoreResult permissions(WxPayScoreRequest request) throws WxPayException {
+    WxPayConfig config = this.payService.getConfig();
+    String url = this.payService.getPayBaseUrl() + "/v3/payscore/permissions";
+    request.setAppid(config.getAppId());
+    request.setServiceId(config.getServiceId());
+    String permissionNotifyUrl = config.getPayScorePermissionNotifyUrl();
+    if (StringUtils.isBlank(permissionNotifyUrl)) {
+      throw new WxPayException("授权回调地址未配置");
+    }
+    String authorizationCode = request.getAuthorizationCode();
+    if (StringUtils.isBlank(authorizationCode)) {
+      throw new WxPayException("authorizationCode不允许为空");
+    }
+    request.setNotifyUrl(permissionNotifyUrl);
+    String result = this.payService.postV3(url, request.toJson());
+    return WxPayScoreResult.fromJson(result);
+
+  }
+
+  @Override
+  public WxPayScoreResult permissionsQueryByAuthorizationCode(String authorizationCode) throws WxPayException {
+    WxPayConfig config = this.payService.getConfig();
+    if (StringUtils.isBlank(authorizationCode)) {
+      throw new WxPayException("authorizationCode不允许为空");
+    }
+    String url = String.format("%s/v3/payscore/permissions/authorization-code/%s", this.payService.getPayBaseUrl(), authorizationCode);
+    URIBuilder uriBuilder;
+    try {
+      uriBuilder = new URIBuilder(url);
+    } catch (URISyntaxException e) {
+      throw new WxPayException("未知异常！", e);
+    }
+
+    uriBuilder.setParameter("service_id", config.getServiceId());
+    try {
+      String result = payService.getV3(uriBuilder.build().toString());
+      return WxPayScoreResult.fromJson(result);
+    } catch (URISyntaxException e) {
+      throw new WxPayException("未知异常！", e);
+    }
+
+  }
+
+  @Override
+  public WxPayScoreResult permissionsTerminateByAuthorizationCode(String authorizationCode, String reason) throws WxPayException {
+    WxPayConfig config = this.payService.getConfig();
+    if (StringUtils.isBlank(authorizationCode)) {
+      throw new WxPayException("authorizationCode不允许为空");
+    }
+    String url = String.format("%s/v3/payscore/permissions/authorization-code/%s/terminate", this.payService.getPayBaseUrl(), authorizationCode);
+    Map<String, Object> map = new HashMap<>(4);
+    map.put("service_id", config.getServiceId());
+    map.put("reason", reason);
+    String result = payService.postV3(url, WxGsonBuilder.create().toJson(map));
+    return WxPayScoreResult.fromJson(result);
+
+  }
+
+  @Override
+  public WxPayScoreResult permissionsQueryByOpenId(String openId) throws WxPayException {
+    WxPayConfig config = this.payService.getConfig();
+    if (StringUtils.isBlank(openId)) {
+      throw new WxPayException("openId不允许为空");
+    }
+    String url = String.format("%s/v3/payscore/permissions/openid/%s", this.payService.getPayBaseUrl(), openId);
+    URIBuilder uriBuilder;
+    try {
+      uriBuilder = new URIBuilder(url);
+    } catch (URISyntaxException e) {
+      throw new WxPayException("未知异常！", e);
+    }
+
+    uriBuilder.setParameter("appid", config.getAppId());
+    uriBuilder.setParameter("service_id", config.getServiceId());
+    try {
+      String result = payService.getV3(uriBuilder.build().toString());
+      return WxPayScoreResult.fromJson(result);
+    } catch (URISyntaxException e) {
+      throw new WxPayException("未知异常！", e);
+    }
+
+  }
+
+  @Override
+  public WxPayScoreResult permissionsTerminateByOpenId(String openId, String reason) throws WxPayException {
+    WxPayConfig config = this.payService.getConfig();
+    if (StringUtils.isBlank(openId)) {
+      throw new WxPayException("openId不允许为空");
+    }
+    String url = String.format("%s/v3/payscore/permissions/openid/%s/terminate", this.payService.getPayBaseUrl(), openId);
+    Map<String, Object> map = new HashMap<>(4);
+    map.put("service_id", config.getServiceId());
+    map.put("appid", config.getAppId());
+    map.put("reason", reason);
+    String result = payService.postV3(url, WxGsonBuilder.create().toJson(map));
+    return WxPayScoreResult.fromJson(result);
+
+  }
+
+  @Override
   public WxPayScoreResult createServiceOrder(WxPayScoreRequest request) throws WxPayException {
-    boolean needUserConfirm = request.isNeedUserConfirm();
+    boolean needUserConfirm = request.getNeedUserConfirm();
     WxPayConfig config = this.payService.getConfig();
     String url = this.payService.getPayBaseUrl() + "/v3/payscore/serviceorder";
     request.setAppid(config.getAppId());
     request.setServiceId(config.getServiceId());
     request.setNotifyUrl(config.getPayScoreNotifyUrl());
-    String result = payService.postV3(url, GSON.toJson(request));
-    WxPayScoreResult wxPayScoreCreateResult = GSON.fromJson(result, WxPayScoreResult.class);
+    String result = this.payService.postV3(url, request.toJson());
+    WxPayScoreResult wxPayScoreCreateResult = WxPayScoreResult.fromJson(result);
 
     //补充算一下签名给小程序跳转用
     String currentTimeMillis = System.currentTimeMillis() + "";
@@ -83,8 +188,8 @@ public class PayScoreServiceImpl implements PayScoreService {
     uriBuilder.setParameter("service_id", config.getServiceId());
     uriBuilder.setParameter("appid", config.getAppId());
     try {
-      String result = payService.getV3(uriBuilder.build());
-      return GSON.fromJson(result, WxPayScoreResult.class);
+      String result = payService.getV3(uriBuilder.build().toString());
+      return WxPayScoreResult.fromJson(result);
     } catch (URISyntaxException e) {
       throw new WxPayException("未知异常！", e);
     }
@@ -95,12 +200,12 @@ public class PayScoreServiceImpl implements PayScoreService {
   public WxPayScoreResult cancelServiceOrder(String outOrderNo, String reason) throws WxPayException {
     WxPayConfig config = this.payService.getConfig();
     String url = String.format("%s/v3/payscore/serviceorder/%s/cancel", this.payService.getPayBaseUrl(), outOrderNo);
-    HashMap<String, Object> map = new HashMap<>(4);
+    Map<String, Object> map = new HashMap<>(4);
     map.put("appid", config.getAppId());
     map.put("service_id", config.getServiceId());
     map.put("reason", reason);
-    String result = payService.postV3(url, GSON.toJson(map));
-    return GSON.fromJson(result, WxPayScoreResult.class);
+    String result = payService.postV3(url, WxGsonBuilder.create().toJson(map));
+    return WxPayScoreResult.fromJson(result);
   }
 
   @Override
@@ -111,8 +216,8 @@ public class PayScoreServiceImpl implements PayScoreService {
     request.setAppid(config.getAppId());
     request.setServiceId(config.getServiceId());
     request.setOutOrderNo(null);
-    String result = payService.postV3(url, GSON.toJson(request));
-    return GSON.fromJson(result, WxPayScoreResult.class);
+    String result = payService.postV3(url, request.toJson());
+    return WxPayScoreResult.fromJson(result);
   }
 
   @Override
@@ -123,19 +228,19 @@ public class PayScoreServiceImpl implements PayScoreService {
     request.setAppid(config.getAppId());
     request.setServiceId(config.getServiceId());
     request.setOutOrderNo(null);
-    String result = payService.postV3(url, GSON.toJson(request));
-    return GSON.fromJson(result, WxPayScoreResult.class);
+    String result = payService.postV3(url, request.toJson());
+    return WxPayScoreResult.fromJson(result);
   }
 
   @Override
   public WxPayScoreResult payServiceOrder(String outOrderNo) throws WxPayException {
     WxPayConfig config = this.payService.getConfig();
     String url = String.format("%s/v3/payscore/serviceorder/%s/pay", this.payService.getPayBaseUrl(), outOrderNo);
-    HashMap<String, Object> map = new HashMap<>(2);
+    Map<String, Object> map = new HashMap<>(2);
     map.put("appid", config.getAppId());
     map.put("service_id", config.getServiceId());
-    String result = payService.postV3(url, GSON.toJson(map));
-    return GSON.fromJson(result, WxPayScoreResult.class);
+    String result = payService.postV3(url, WxGsonBuilder.create().toJson(map));
+    return WxPayScoreResult.fromJson(result);
   }
 
   @Override
@@ -146,12 +251,33 @@ public class PayScoreServiceImpl implements PayScoreService {
     request.setAppid(config.getAppId());
     request.setServiceId(config.getServiceId());
     request.setOutOrderNo(null);
-    String result = payService.postV3(url, GSON.toJson(request));
-    return GSON.fromJson(result, WxPayScoreResult.class);
+    String result = payService.postV3(url, request.toJson());
+    return WxPayScoreResult.fromJson(result);
   }
 
   @Override
-  public PayScoreNotifyData parseNotifyData(String data) {
+  public UserAuthorizationStatusNotifyResult parseUserAuthorizationStatusNotifyResult(String notifyData, SignatureHeader header) throws WxPayException {
+    PayScoreNotifyData response = parseNotifyData(notifyData, header);
+    PayScoreNotifyData.Resource resource = response.getResource();
+    String cipherText = resource.getCipherText();
+    String associatedData = resource.getAssociatedData();
+    String nonce = resource.getNonce();
+    String apiV3Key = this.payService.getConfig().getApiV3Key();
+    try {
+      String result = AesUtils.decryptToString(associatedData, nonce, cipherText, apiV3Key);
+      UserAuthorizationStatusNotifyResult notifyResult = GSON.fromJson(result, UserAuthorizationStatusNotifyResult.class);
+      notifyResult.setRawData(response);
+      return notifyResult;
+    } catch (GeneralSecurityException | IOException e) {
+      throw new WxPayException("解析报文异常！", e);
+    }
+  }
+
+  @Override
+  public PayScoreNotifyData parseNotifyData(String data, SignatureHeader header) throws WxPayException {
+    if (Objects.nonNull(header) && !this.verifyNotifySign(header, data)) {
+      throw new WxPayException("非法请求，头部信息验证失败");
+    }
     return GSON.fromJson(data, PayScoreNotifyData.class);
   }
 
@@ -163,10 +289,22 @@ public class PayScoreServiceImpl implements PayScoreService {
     String nonce = resource.getNonce();
     String apiV3Key = this.payService.getConfig().getApiV3Key();
     try {
-      String s = AesUtils.decryptToString(associatedData, nonce, cipherText, apiV3Key);
-      return GSON.fromJson(s, WxPayScoreResult.class);
+      return WxPayScoreResult.fromJson(AesUtils.decryptToString(associatedData, nonce, cipherText, apiV3Key));
     } catch (GeneralSecurityException | IOException e) {
       throw new WxPayException("解析报文异常！", e);
     }
+  }
+
+  /**
+   * 校验通知签名
+   *
+   * @param header 通知头信息
+   * @param data   通知数据
+   * @return true:校验通过 false:校验不通过
+   */
+  private boolean verifyNotifySign(SignatureHeader header, String data) {
+    String beforeSign = String.format("%s%n%s%n%s%n", header.getTimeStamp(), header.getNonce(), data);
+    return payService.getConfig().getVerifier().verify(header.getSerialNo(),
+      beforeSign.getBytes(StandardCharsets.UTF_8), header.getSigned());
   }
 }
